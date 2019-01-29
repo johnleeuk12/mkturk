@@ -63,7 +63,7 @@ async generate_trials(n_trials){
 
 	var image_requests = []; 
 
-	// console.log('TQ.generate_trials() will generate '+n_trials+' trials')
+	console.log('TQ.generate_trials() will generate '+n_trials+' trials')
 
 	for (var i = 0; i < n_trials; i++){
 		if (TASK.NTrialsPerBagBlock <= 0){
@@ -87,6 +87,7 @@ async generate_trials(n_trials){
 
 				// make new bag
 				this.samplebag_block_indices = []
+				var blocklen = this.samplebag_labels.filter(temp => temp == this.currentbag).length;
 				for (var j = 0; j <= this.samplebag_labels.length-1; j++){
 					if (this.samplebag_labels[j] == this.currentbag){
 						this.samplebag_block_indices.push(j)
@@ -126,7 +127,7 @@ async generate_trials(n_trials){
 		this.num_in_queue++;
 	}
 	// Download images to support these trials to download queue
-	// console.log("TQ.generate_trials() will request", image_requests.length)
+	console.log("TQ.generate_trials() will request", image_requests.length)
 	await this.IB.cache_these_images(image_requests); 
 }
 
@@ -136,7 +137,7 @@ async get_next_trial(){
 	// along with its sample/test images 
 
 	if (this.sampleq.filename.length == 0){
-		// console.log("Reached end of trial queue... generating one more in this.get_next_trial")
+		console.log("Reached end of trial queue... generating one more in this.get_next_trial")
 		await this.generate_trials(1); 
 	}
 
@@ -149,7 +150,7 @@ async get_next_trial(){
 
 
 	// If the past NStickyResponse trials has been on one side, then make this upcoming trial's correct answer be at another location. 
-	if (FLAGS.stickyresponse >= TASK.NStickyResponse &&
+	/*if (FLAGS.stickyresponse >= TASK.NStickyResponse &&
 		TASK.NStickyResponse > 0 && 
 		test_correctIndex == TRIAL.Response[CURRTRIAL.num-1])
 	{
@@ -182,7 +183,7 @@ async get_next_trial(){
 
 		test_correctIndex = correct_label_nonstick_location
 	}
-
+    */
 	// Get image from imagebag
 	var sample_image = await this.IB.get_by_name(sample_filename); 
 	var test_images = []
@@ -190,9 +191,9 @@ async get_next_trial(){
 		test_images.push(await this.IB.get_by_name(test_filenames[i]))
 	}
 
-	// console.log('sample- get_next_trial()  image:', sample_index, '. name:', sample_filename); 
-	// console.log('test- get_next_trial() images:', test_indices, '. name:', test_filenames); 
-	// console.log('correct- get_next_trial()', test_correctIndex)
+	console.log('sample- get_next_trial()  image:', sample_index, '. name:', sample_filename); 
+	console.log('test- get_next_trial() images:', test_indices, '. name:', test_filenames); 
+	console.log('correct- get_next_trial()', test_correctIndex)
 	this.num_in_queue--;
 
 	return [sample_image, sample_index, test_images, test_indices, test_correctIndex]
@@ -213,6 +214,8 @@ function selectSampleImage(samplebag_indices, SamplingStrategy){
 
 	return sample_image_index
 }
+
+
 
 function selectTestImages(correct_label, testbag_labels){
 	
@@ -280,7 +283,10 @@ function selectTestImages(correct_label, testbag_labels){
 	var testpool = []
 	testpool.push(... distractors)
 	testpool.push(correct_label)
-	testpool = shuffle(testpool)	
+	if(correct_label ==1){
+		testpool = [1,0]
+	}
+	//testpool = shuffle(testpool)	
 
 	// For each label in the testpool, add a random testimage index of it to testIndices. 
 	for (var i = 0; i<testpool.length; i++){

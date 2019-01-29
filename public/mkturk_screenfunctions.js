@@ -4,12 +4,13 @@ function refreshCanvasSettings(TASK){
 
 	// Adjust length / toggle presence of gray screen between sample and test screens
 	if (TASK.SampleOFF > 0){
-		CANVAS.sequence = ["blank", "sample","blank","test"]
-		CANVAS.tsequence = [0,100,100+TASK.SampleON,100+TASK.SampleON+TASK.SampleOFF]; 
+		TASK.SOUND_DUR = 100;
+		CANVAS.sequence = ["blank", "sample","sound","blank","test"]
+		CANVAS.tsequence = [0,100,100+TASK.SampleON,100+TASK.SOUND_DUR+TASK.SampleON,100+TASK.SOUND_DUR+TASK.SampleON+TASK.SampleOFF]; 
 	}
 	else if (TASK.SampleOFF <= 0 ){
-		CANVAS.sequence = ["blank","sample","test"]
-		CANVAS.tsequence = [0,100,100+TASK.SampleON]; 
+		CANVAS.sequence = ["blank","sample","sound","test"]
+		CANVAS.tsequence = [0,100,100,100+100+TASK.SampleON]; 
 	}
 	
 	// Adjust length of reward screen based on reward amount 
@@ -132,9 +133,7 @@ function updateHeadsUpDisplay(){
 		task2 = TASK.SampleON + "ms, " + TASK.ImageBagsTest.length + "-categories in pool"
 	}
 	if (CANVAS.headsupfraction > 0){
-		textobj.innerHTML = 
- 		'User: ' + ENV.ResearcherDisplayName + ', ' + ENV.ResearcherEmail + "<br>"
-		+ 'Agent: ' + ENV.Subject + ", <font color=green><b>" + pctcorrect 
+		textobj.innerHTML = ENV.Subject + ": <font color=green><b>" + pctcorrect 
 		+ "%</b></font> " + "(" + ncorrect + " of " + TRIAL.Response.length + " trials)" 
 		+ "<br>" + "NRewards=" + nreward + ", <font color=green><b>" 
 		+ Math.round(TASK.RewardPer1000Trials*nreward/1000) 
@@ -151,12 +150,10 @@ function updateHeadsUpDisplay(){
 		// + "<font color=blue><b>" + blescale.statustext_received + "<br></font>"
 	}
 	else if (CANVAS.headsupfraction == 0){
-		textobj.innerHTML = port.statustext_connect + blescale.statustext_connect
+		textobj.innerHTML = ble.statustext + port.statustext_connect
 	}
 	else if (isNaN(CANVAS.headsupfraction)){ //before task params load
-		textobj.innerHTML = 
-		'User: ' + ENV.ResearcherDisplayName + ', ' + ENV.ResearcherEmail
-		+ "<br>" + "No trials performed"
+		textobj.innerHTML = ble.statustext + port.statustext_connect
 	}
 }
 
@@ -171,11 +168,10 @@ function updateHeadsUpDisplayDevices(){
 		+ "<font color=blue><b>" + blescale.statustext_received + "<br></font>"
 	}
 	else if (CANVAS.headsupfraction == 0){
-		textobj.innerHTML = port.statustext_connect + blescale.statustext_connect
+		textobj.innerHTML = port.statustext_connect
 	}
-	else if (isNaN(CANVAS.headsupfraction)){
-		//before task params load
-		textobj.innerHTML =  port.statustext_connect + blescale.statustext_connect
+	else if (isNaN(CANVAS.headsupfraction)){ //before task params load
+		textobj.innerHTML = ble.statustext_connect
 	}
 }
 
@@ -267,6 +263,14 @@ async function bufferTestImages(sample_image, sample_image_grid_index, test_imag
 	}
 }
 
+async function bufferTestSound(sampleindex){
+	if(sampleindex >0){
+	playSoundChoice(sounds1,0) // index is index of the array, not the name. 
+	}
+	else{
+	playSoundChoice(sounds2,0)
+	}	
+}
 
 async function renderImageOnCanvas(image, grid_index, scale, canvasobj){
 	var context=canvasobj.getContext('2d');
@@ -313,7 +317,7 @@ function displayTrial(sequence,tsequence){
 
 	var start = null;
 	var tActual = []
-	async function updateCanvas(timestamp){
+	function updateCanvas(timestamp){
 
 		// If start has not been set to a float timestamp, set it now.
 		if (!start) start = timestamp;
@@ -321,44 +325,14 @@ function displayTrial(sequence,tsequence){
 		// If time to show new frame, 
 		if (timestamp - start > tsequence[frame.current]){
 			//console.log('Frame =' + frame.current+'. Duration ='+(timestamp-start)+'. Timestamp = ' + timestamp)
-			
 			tActual[frame.current] = Math.round(100*(timestamp - start))/100 //in milliseconds, rounded to nearest hundredth of a millisecond
-			var renderstr = OFFSCREENCANVAS.commitTo(VISIBLECANVAS.getContext("bitmaprenderer"))
-
-			if (renderstr.status == "failed"){
-				console.log("**** FAILED on 1ST rendering attempt of " + sequence[frame.current])
-
-				// attempt again
-				tActual[frame.current] = Math.round(100*(timestamp - start))/100 //in milliseconds, rounded to nearest hundredth of a millisecond
-				var renderstr = OFFSCREENCANVAS.commitTo(VISIBLECANVAS.getContext("bitmaprenderer"))
-
-				console.log("**** " + renderstr.status + " on 2ND rendering attempt of " + sequence[frame.current])
-
-				if (renderstr.status == "failed"){
-					if (sequence[frame.current] == "touchfix" || sequence[frame.current] == "test"){
-						for (var j=0; j < 100; j++){
-							// attempt again
-							await setTimeout(j*100)
-							tActual[frame.current] = Math.round(100*(timestamp - start))/100 //in milliseconds, rounded to nearest hundredth of a millisecond
-							var renderstr = OFFSCREENCANVAS.commitTo(VISIBLECANVAS.getContext("bitmaprenderer"))
-							if (renderstr.status == "succeeded"){
-								break
-							}
-						}
-						console.log("Render "  + sequence[frame.current] + " " + renderstr.status + " after " + j + " attempts")
-					}
-					else {
-						tActual[frame.current] = -99
-						console.log("Skipping render since not touchfix or test screen")
-					} //if touchfix || test
-				} //if failed again
-			} //if failed
+			CANVAS.offscreen.commitTo(CANVAS.visible.getContext("bitmaprenderer"))
 			frame.shown[frame.current]=1;
 			frame.current++;
-		};
+		}; 
 		// continue if not all frames shown
 		if (frame.shown[frame.shown.length-1] != 1){
-			renderScreen(sequence[frame.current],OFFSCREENCANVAS)
+			renderScreen(sequence[frame.current],CANVAS.offscreen)
 			window.requestAnimationFrame(updateCanvas);
 		}
 		else{
@@ -413,6 +387,9 @@ function renderScreen(screenType,canvasobj){
 		break
 	case 'punish':
 		renderPunish(canvasobj)
+		break
+	case 'sound':
+		bufferTestSound(CURRTRIAL.sampleindex)
 		break
 	default:
 	}

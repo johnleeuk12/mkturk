@@ -111,14 +111,13 @@ async function getImageListDropboxRecursive(dirpath){
 	}
 	try{
 		var entries = []
-		let response = await dbx.filesListFolder({path: dirpath, 
+		response = await dbx.filesListFolder({path: dirpath, 
 											  recursive: true}) 
 		entries.push(... response.entries)
 
 		// Use response.has_more to propagate 
 		var num_iterations = 0
 		var iteration_limit = 100
-		response.has_more = false
 		while(response.has_more == true){
 			response = await dbx.filesListFolderContinue(response.cursor)
 			entries.push(... response.entries)
@@ -165,7 +164,6 @@ async function checkParameterFileStatus(){
 			ENV.ParamFileDate = new Date(filemeta.client_modified)
 
 			FLAGS.need2loadParameters = 1
-		updateEventDataonFirestore(EVENTS);
 
 			console.log('Parameter file on disk was changed. New rev =' + ENV.ParamFileRev)
 		}
@@ -265,6 +263,43 @@ function loadSoundfromDropbox2(src,idx){
 	})
 	})
 }
+
+function loadSoundfromDropboxCat1(src,idx){
+	return new Promise(function(resolve,reject){
+		dbx.filesDownload({path: SOUND_PATH + SOUND_CAT1 + src + ".wav"}).then(function(data){
+		var reader = new FileReader()
+		reader.onload = function(e){
+			audiocontext.decodeAudioData(reader.result).then(function(buffer){
+				sounds1.buffer[idx] = buffer;
+				resolve(idx)
+			})
+		}
+		reader.readAsArrayBuffer(data.fileBlob)
+	})
+	.catch(function(error){
+		console.error(error)
+	})
+	})
+}
+
+function loadSoundfromDropboxCat2(src,idx){
+	return new Promise(function(resolve,reject){
+		dbx.filesDownload({path: SOUND_PATH + SOUND_CAT2 + src + ".wav"}).then(function(data){
+		var reader = new FileReader()
+		reader.onload = function(e){
+			audiocontext.decodeAudioData(reader.result).then(function(buffer){
+				sounds2.buffer[idx] = buffer;
+				resolve(idx)
+			})
+		}
+		reader.readAsArrayBuffer(data.fileBlob)
+	})
+	.catch(function(error){
+		console.error(error)
+	})
+	})
+}
+
 
 
 //================== LOAD IMAGE ==================//
@@ -380,7 +415,7 @@ async function loadImagefromDropbox(imagepath){
 							var image = new Image(); 
 
 							image.onload = function(){
-								// console.log('Loaded: ' + (imagepath));
+								console.log('Loaded: ' + (imagepath));
 								updateImageLoadingAndDisplayText('Loaded: ' + imagepath)
 								resolve(image)
 								}
@@ -412,7 +447,6 @@ async function saveBehaviorDatatoDropbox(TASK, ENV, CANVAS, TRIAL){
         var dataobj = [] 
 
 		dataobj.push(ENV)
-		dataobj.push(IMAGES.imagepaths)
 		dataobj.push(CANVAS)
 		dataobj.push(TASK)
 		dataobj.push(TRIAL)

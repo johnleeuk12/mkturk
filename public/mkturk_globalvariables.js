@@ -9,18 +9,6 @@
 var TASK = {}; // Global that encapsulates state of the current task, read from Subject's Params file
 var TRIAL = resetTRIAL() // Global that contains data variables that are incremented every trial, and are dumped to disk for scientific purposes.
 var ENV = {}; // Task specific variables that are slaves to TASK settings, but still desired to be recorded. Hence, they should not appear in the TASK-based params file, but should be logged on their own. 
-var IMAGES = {
-	Sample: {}, Test: {}, 
-	object: {sample:{}, test: {}},
-	imagepaths: {Ordered_Samplebag_Filenames: {}, Ordered_Testbag_Filenames: {}}
-}
-
-ENV.ResearcherDisplayName = ''
-ENV.ResearcherEmail = ''
-ENV.ResearcherLastName = ''
-ENV.ResearcherID = ''
-ENV.USBDeviceType = ''
-ENV.USBDeviceName = ''
 ENV.Subject = ''
 ENV.CurrentDate = new Date;
 ENV.ImageHeightPixels = NaN; 
@@ -31,12 +19,14 @@ ENV.FixationRadius = 0
 ENV.FixationColor = ''
 ENV.XGridCenter = []
 ENV.YGridCenter = []
-ENV.RewardDuration = NaN
+ENV.RewardDuration = 1
+ENV.Ordered_Samplebag_Filenames = []
+ENV.Ordered_Testbag_Filenames = []
 ENV.ParamFileName = ''
 ENV.ParamFileRev = ''
 ENV.ParamFileDate = '' //stores complete path to subject parameter file
 ENV.DataFileName = '' //stores complete path to behavioral data file
-ENV.FirestoreDocRoot = ''
+ENV.BatteryLDT = []
 ENV.CurrentAutomatorStageName = ''
 ENV.MinPercentCriterion = -1
 ENV.MinTrialsCriterion = -1
@@ -58,30 +48,25 @@ FLAGS.punishOutsideTouch = 0
 FLAGS.acquiredTouch = 0
 FLAGS.touchGeneratorCreated = 0
 FLAGS.runPump = 0
-FLAGS.firestorecreatedoc = 0
-FLAGS.firestorelastsavedtrial = 0
-FLAGS.firestoretimeron = 0
-FLAGS.stressTest = 0
 
 var CANVAS = {}; 
 var CANVAS = {
-	names: ["blank","sample","test","touchfix","eyefix","reward","photoreward","punish"],
+	names: ["blank","sample","test","touchfix","eyefix","reward","photoreward","punish","sound"],
 	front: "blank",
 	sequenceblank: ["blank","blank"], 
 	tsequenceblank: [0,50], 
 	sequencepre: ["touchfix"],
 	tsequencepre: [0],
-	sequence: ["blank","sample","blank","test"], // blank, sample, blank, test
+	//sequence: ["blank","blank","sample","sound","blank","test"], // blank, sample, blank, test
 	tsequence: NaN, 
 	sequencepost: ["blank","reward","blank"], // blank, reward
 	tsequencepost: [0,50,100],
 	headsupfraction: NaN,
 	offsetleft: 0,
 	offsettop: 0,
+	visible: document.getElementById("canvasvisible"),
+	offscreen: null,
 }
-
-var OFFSCREENCANVAS = null
-var VISIBLECANVAS = document.getElementById("canvasvisible")
 
 var frame = {
 	current: 0,
@@ -111,60 +96,6 @@ CURRTRIAL.lastDropboxSave = new Date
 CURRTRIAL.tsequenceactual = []
 CURRTRIAL.tsequencedesired = []
 
-CURRTRIAL.sampleobjectty = []
-CURRTRIAL.sampleobjecttz = []
-CURRTRIAL.sampleobjectrxy = []
-CURRTRIAL.sampleobjectrxz = []
-CURRTRIAL.sampleobjectryz = []
-CURRTRIAL.sampleobjectscale = []
-
-CURRTRIAL.testobjectty = []
-CURRTRIAL.testobjecttz = []
-CURRTRIAL.testobjectrxy = []
-CURRTRIAL.testobjectrxz = []
-CURRTRIAL.testobjectryz = []
-CURRTRIAL.testobjectscale = []
-
-var EVENTS = {}
-EVENTS.reset = function(){
-	this.trialnum = CURRTRIAL.num;
-	this.trialseries = {};
-	this.timeseries = {};
-	this.imageseries = {};
-	this.trialseries.Sample = {}
-	this.trialseries.Test = {}
-	this.trialseries.CorrectItem = {}
-	this.trialseries.FixationGridIndex = {}
-	this.trialseries.StartTime = {}
-	this.trialseries.FixationTouchEvent = {}
-	this.trialseries.FixationXYT = {}
-	this.trialseries.Response = {}
-	this.trialseries.TSequenceDesired = {}
-	this.trialseries.TSequenceActual = {}
-	this.trialseries.ResponseTouchEvent = {}
-	this.trialseries.ResponseXYT = {}
-	this.trialseries.Response = {}
-	this.trialseries.NReward = {}
-	this.timeseries.BatteryLDT = {}	
-	this.timeseries.RFIDTag = {}
-	this.timeseries.Weight = {}
-	this.timeseries.BLEBattery = {}
-
-	this.imageseries.SampleObjectTy = {}
-	this.imageseries.SampleObjectTz = {}
-	this.imageseries.SampleObjectRxy = {}
-	this.imageseries.SampleObjectRxz = {}
-	this.imageseries.SampleObjectRyz = {}
-	this.imageseries.SampleObjectScale = {}
-	this.imageseries.TestObjectTy = {}
-	this.imageseries.TestObjectTz = {}
-	this.imageseries.TestObjectRxy = {}
-	this.imageseries.TestObjectRxz = {}
-	this.imageseries.TestObjectRyz = {}
-	this.imageseries.TestObjectScale = {}
-}
-EVENTS.reset()
-
 
 var trialhistory = {}
 trialhistory.trainingstage = []
@@ -172,9 +103,18 @@ trialhistory.starttime = []
 trialhistory.response = []
 trialhistory.correct = []
 
-
 var sounds = {
 	serial: [0,1,2,3,4],
+	buffer: [],
+}
+
+var sounds1 = {
+	serial: [1],
+	buffer: [],
+}
+
+var sounds2 = {
+	serial: [1],
 	buffer: [],
 }
 var boundingBoxesFixation={}; //where the fixation touch targets are on the canvas
@@ -187,6 +127,11 @@ var ycanvascenter=[];
 var curridx = null;
 var datafiles=[];
 var displayoutofboundsstr=""
+var SOUND_CAT1 = "cat1/V_phee_"
+var SOUND_CAT2 = "cat2/au"
+
+
+
 
 //================ UPDATE VARIABLE FUNCTIONS ================//
 function resetTRIAL(){
@@ -214,26 +159,6 @@ function resetTRIAL(){
 	TRIAL.WeightTime = []
 	TRIAL.WeightTrial = []
 	TRIAL.NWeights = 0
-	TRIAL.BatteryLDT = []	
-	navigator.getBattery().then(function(batteryobj){
-		TRIAL.BatteryLDT.push([batteryobj.level, batteryobj.dischargingTime, Math.round(performance.now())]);
-		logEVENTS("BatteryLDT",TRIAL.BatteryLDT[TRIAL.BatteryLDT.length-1],"timeseries")
-
-	TRIAL.SampleObjectTy = []
-	TRIAL.SampleObjectTz = []
-	TRIAL.SampleObjectRxy = []
-	TRIAL.SampleObjectRxz = []
-	TRIAL.SampleObjectRyz = []
-	TRIAL.SampleObjectScale = []
-
-	TRIAL.TestObjectTy = []
-	TRIAL.TestObjectTz = []
-	TRIAL.TestObjectRxy = []
-	TRIAL.TestObjectRxz = []
-	TRIAL.TestObjectRyz = []
-	TRIAL.TestObjectScale = []
-
-	}) // starting battery level
 	return TRIAL
 }
 
@@ -253,20 +178,6 @@ function updateTRIAL(){
 	TRIAL.AutomatorStage[CURRTRIAL.num] = TASK.CurrentAutomatorStage; 
 	TRIAL.TSequenceDesired[CURRTRIAL.num] = CURRTRIAL.tsequencedesired
 	TRIAL.TSequenceActual[CURRTRIAL.num] = CURRTRIAL.tsequenceactual
-
-	TRIAL.SampleObjectTy[CURRTRIAL.num] = CURRTRIAL.sampleobjectty
-	TRIAL.SampleObjectTz[CURRTRIAL.num] = CURRTRIAL.sampleobjecttz
-	TRIAL.SampleObjectRxy[CURRTRIAL.num] = CURRTRIAL.sampleobjectrxy
-	TRIAL.SampleObjectRxz[CURRTRIAL.num] = CURRTRIAL.sampleobjectrxz
-	TRIAL.SampleObjectRyz[CURRTRIAL.num] = CURRTRIAL.sampleobjectryz
-	TRIAL.SampleObjectScale[CURRTRIAL.num] = CURRTRIAL.sampleobjectscale
-
-	TRIAL.TestObjectTy[CURRTRIAL.num] = CURRTRIAL.testobjectty
-	TRIAL.TestObjectTz[CURRTRIAL.num] = CURRTRIAL.testobjecttz
-	TRIAL.TestObjectRxy[CURRTRIAL.num] = CURRTRIAL.testobjectrxy
-	TRIAL.TestObjectRxz[CURRTRIAL.num] = CURRTRIAL.testobjectrxz
-	TRIAL.TestObjectRyz[CURRTRIAL.num] = CURRTRIAL.testobjectryz
-	TRIAL.TestObjectScale[CURRTRIAL.num] = CURRTRIAL.testobjectscale
 }
 
 function updateTrialHistory(){
@@ -277,46 +188,6 @@ function updateTrialHistory(){
 	trialhistory.correct.push(CURRTRIAL.correct)
 }
 
-function logEVENTS(eventname,eventval,eventtype){
-	//log events for a trial
-	if (eventtype == 'trialseries' || eventtype == 'imageseries'){
-		//index by trial
-		var indevent = EVENTS.trialnum
-		if (FLAGS.savedata == 0){
-			indevent = 0 //store most recent trial in first position until start saving data
-		}
-// 		EVENTS[eventtype][eventname][indevent.toString()] = eventval
-
-		if (typeof(eventval) == "number" ||
-			typeof(eventval) == "string" || 
-			eventval.length == 1){
-			if (!Array.isArray(EVENTS[eventtype][eventname])){
-				EVENTS[eventtype][eventname] = []; //initialize to array
-			} //if initialized as object, convert to array
-			EVENTS[eventtype][eventname][indevent] = eventval
-		}
-		else if (typeof(eventval) == "object" ||
-				eventval.length > 1){
-			for (var i=0; i<=eventval.length-1; i++){
-				if (typeof(EVENTS[eventtype][eventname][i.toString()]) == "undefined"){
-					EVENTS[eventtype][eventname][i.toString()]={}; //initialize array
-EVENTS[eventtype][eventname][i.toString()] = []
-				} //if not initialized
-				EVENTS[eventtype][eventname][i.toString()][indevent] = eventval[i]
-			}
-		}
-	}
-	else if (eventtype == 'timeseries'){
-		//running index
-		var indevent = Object.keys(EVENTS[eventtype][eventname]).length
-		if (FLAGS.savedata == 0){
-			indevent = 0 //store most recent timepoint in first position until start saving data
-		}
-		var trialtime = [EVENTS.trialnum, Math.round(performance.now())]
-		EVENTS[eventtype][eventname][indevent.toString()] = trialtime.concat(eventval)
-	}
-}
-
 function purgeTrackingVariables(){
 	// Purges heresies committed in the test period 
 	TRIAL = resetTRIAL()
@@ -324,13 +195,11 @@ function purgeTrackingVariables(){
 	ENV.CurrentDate = new Date;
 	var datestr = ENV.CurrentDate.toISOString();
 	ENV.DataFileName = DATA_SAVEPATH + ENV.Subject + "/" + datestr.slice(0,datestr.indexOf(".")) + "_" + ENV.Subject + ".txt";
-	ENV.FirestoreDocRoot = datestr.slice(0,datestr.indexOf(".")) + "_" + ENV.Subject
 
 	if(FLAGS.waitingforTouches > 0 || FLAGS.purge == 1){
 		// purge requested by user at beginning of trial during fixation (most likely) 
 		console.log('setting to 0')
 		CURRTRIAL.num = 0
-		EVENTS.trialnum = 0
 	}
 	else{
 		console.log('setting to -1')

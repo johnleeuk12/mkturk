@@ -1,5 +1,6 @@
 //======== Performance Line Plot =======//
 var lineOptions={
+	smooth: 5,
   	width: 900,
   	height: 400,
 	hAxis: {title: 'Trial#'},
@@ -10,14 +11,10 @@ var lineOptions={
 		easing: 'linear',
 		startup: true,
 	},
-	series: {
-         //   1: { color: '#1c91c0' },
-            1: {color:  '#e2431e'},
-            0: { color: '#43459d' }
-        }
-          
+	legend: {
+		position: 'none',
+	}
 }
-
 
 //======== Trial Slider =======//
 var livesliderTrialOptions={
@@ -46,7 +43,7 @@ var areaOptions={
   	areaOpacity: 0.5,
 	hAxis: {title: 'Time (h)'},
 	vAxes: {0: {title: 'Trial count'},
-			1: {title: 'RFID & Weight'}
+			1: {title: 'RFID & Weight (in thousands)'}
 			},
 	animation: {
 		duration: 500,
@@ -85,23 +82,6 @@ var livesliderTimeOptions={
 	} //ui
 }//options
 
-//======== WeightReadsPlot ==========//
-var weightOptions = {
-	width: 900,
-	height: 300,
-	vAxis: {title: "weights (grams)",viewWindow: {min: 0, max: 500}, minValue:0, maxValue:500},
-	hAxis: {title: "Time (h)"},
-	title: 'Weight Reads',
-	legend: {position: 'none'},
-	// animation: {
-	// 	duration: 500,
-	// 	easing: 'linear',
-	// 	startup: true,
-	// },
-	colors: ['#6f9654']
-	
-}
-
 //======== ObjPerformanceBar ========//
 var objPerfBarOptions={
 	width: 900,
@@ -113,10 +93,20 @@ var objPerfBarOptions={
 	
 }
 
-//======== Touch ScatterPlot =======// 
+//======== Touch ScatterPlot =======//
 var scatterOptions = {
-	pointSize: 1,
-	seriesType: 'scatter'
+	title: 'Touch Locations',
+	width: 700,
+	height: 700, 
+	hAxis: {title: 'X position (pixels)', minValue: 0, maxValue: 1768/2},
+	vAxis : {title: 'Y position (pixels)', minValue: 600, maxValue: 1744/2},
+	series: {
+		0: {color: 'black'},
+		1: {color: 'red'},
+		2: {color: 'blue',},
+		3: {color: 'red'}
+
+	}
 }
 
 //======== ChoiceBar ========//
