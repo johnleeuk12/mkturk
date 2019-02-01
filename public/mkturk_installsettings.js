@@ -4,12 +4,12 @@
 // ------ Dropbox WebApp settings ------ 
 // MKTURK
 var DBX_CLIENT_ID = "ken0pm2tkvugo5g" //mkturkissa
-var DBX_REDIRECT_URI_ROOT = "http://localhost:5030/"
-// var DBX_REDIRECT_URI_ROOT = "https://sandbox-ce2c5.firebaseapp.com/mkturk/"
+//var DBX_REDIRECT_URI_ROOT = "http://localhost:5030/"
+var DBX_REDIRECT_URI_ROOT = "https://mkturkwanglab-7a650.firebaseapp.com/"
 
 // ------ Subject settings ------ 
 var subjectlist = [
-"Eliaso","Youno","Tahereho","Praneetho","West","Waffles","Setta","Sausage","Rafiki","Hutch","Barb","AJ"
+"Eliaso","John"
 ];
 
 // ------ Save location settings ------

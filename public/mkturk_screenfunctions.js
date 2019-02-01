@@ -10,7 +10,7 @@ function refreshCanvasSettings(TASK){
 	}
 	else if (TASK.SampleOFF <= 0 ){
 		CANVAS.sequence = ["blank","sample","sound","test"]
-		CANVAS.tsequence = [0,100,100,100+100+TASK.SampleON]; 
+		CANVAS.tsequence = [0,100,100+TASK.SampleON,100+TASK.SampleON+TASK.SOUND_DUR]; 
 	}
 	
 	// Adjust length of reward screen based on reward amount 
@@ -133,7 +133,9 @@ function updateHeadsUpDisplay(){
 		task2 = TASK.SampleON + "ms, " + TASK.ImageBagsTest.length + "-categories in pool"
 	}
 	if (CANVAS.headsupfraction > 0){
-		textobj.innerHTML = ENV.Subject + ": <font color=green><b>" + pctcorrect 
+		textobj.innerHTML = 
+ 		'User: ' + ENV.ResearcherDisplayName + ', ' + ENV.ResearcherEmail + "<br>"
+		+ 'Agent: ' + ENV.Subject + ", <font color=green><b>" + pctcorrect 
 		+ "%</b></font> " + "(" + ncorrect + " of " + TRIAL.Response.length + " trials)" 
 		+ "<br>" + "NRewards=" + nreward + ", <font color=green><b>" 
 		+ Math.round(TASK.RewardPer1000Trials*nreward/1000) 
@@ -150,10 +152,12 @@ function updateHeadsUpDisplay(){
 		// + "<font color=blue><b>" + blescale.statustext_received + "<br></font>"
 	}
 	else if (CANVAS.headsupfraction == 0){
-		textobj.innerHTML = ble.statustext + port.statustext_connect
+		textobj.innerHTML = port.statustext_connect + blescale.statustext_connect
 	}
 	else if (isNaN(CANVAS.headsupfraction)){ //before task params load
-		textobj.innerHTML = ble.statustext + port.statustext_connect
+		textobj.innerHTML = 
+		'User: ' + ENV.ResearcherDisplayName + ', ' + ENV.ResearcherEmail
+		+ "<br>" + "No trials performed"
 	}
 }
 
@@ -168,10 +172,11 @@ function updateHeadsUpDisplayDevices(){
 		+ "<font color=blue><b>" + blescale.statustext_received + "<br></font>"
 	}
 	else if (CANVAS.headsupfraction == 0){
-		textobj.innerHTML = port.statustext_connect
+		textobj.innerHTML = port.statustext_connect + blescale.statustext_connect
 	}
-	else if (isNaN(CANVAS.headsupfraction)){ //before task params load
-		textobj.innerHTML = ble.statustext_connect
+	else if (isNaN(CANVAS.headsupfraction)){
+		//before task params load
+		textobj.innerHTML =  port.statustext_connect + blescale.statustext_connect
 	}
 }
 
@@ -326,13 +331,13 @@ function displayTrial(sequence,tsequence){
 		if (timestamp - start > tsequence[frame.current]){
 			//console.log('Frame =' + frame.current+'. Duration ='+(timestamp-start)+'. Timestamp = ' + timestamp)
 			tActual[frame.current] = Math.round(100*(timestamp - start))/100 //in milliseconds, rounded to nearest hundredth of a millisecond
-			CANVAS.offscreen.commitTo(CANVAS.visible.getContext("bitmaprenderer"))
+			OFFSCREENCANVAS.commitTo(VISIBLECANVAS.getContext("bitmaprenderer"))
 			frame.shown[frame.current]=1;
 			frame.current++;
 		}; 
 		// continue if not all frames shown
 		if (frame.shown[frame.shown.length-1] != 1){
-			renderScreen(sequence[frame.current],CANVAS.offscreen)
+			renderScreen(sequence[frame.current],OFFSCREENCANVAS)
 			window.requestAnimationFrame(updateCanvas);
 		}
 		else{

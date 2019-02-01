@@ -51,10 +51,11 @@
 
 		<p id="headsuptext" style="z-index:101; position: absolute; left: 1px; top: 1px; height: 40%; width: 50%; font-size: 20px; color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; word-break: break-all;"></p>
 
-		<p id="headsuptextdevices" style="z-index:101; position: absolute; left: 50%; top: 1px; height: 40%; width: 40%; font-size: 16px; color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; word-break: break-all;"></p>
+		<p id="headsuptextdevices" style="z-index:101; position: absolute; left: 50%; top: 1px; height: 40%; width: 40%; font-size: 16px; color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; word-break: break-all;">No
+			devices connected</p>
 
 		<!-- 	<p id="headsuptextautomator" style="z-index:99; position: absolute; left: 50%; top: 1px; height: 40%; width: 50%; font-size: 20px; color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;  word-break: break-all;"></p>
- -->
+	 -->
 		<p id="imageloadingtext" style="z-index:100; position: absolute; left: 1px; top: 1px; height: 5%; width: 100%; font-size: 16px; color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;  word-break: break-all;"></p>
 
 		<button name="doneEditingParams" style="visibility:hidden; position: absolute; top: 45%; left: 70%; height: 75px; width: 100px; border-radius: 20px">Done
@@ -158,7 +159,7 @@
 		var gainNode = audiocontext.createGain()
 		gainNode.connect(audiocontext.destination)
 		ENV.DevicePixelRatio = window.devicePixelRatio || 1;
-		var visiblecontext = CANVAS.visible.getContext("bitmaprenderer");
+		var visiblecontext = VISIBLECANVAS.getContext("bitmaprenderer");
 		var backingStoreRatio = visiblecontext.webkitBackingStorePixelRatio ||
 			visiblecontext.mozBackingStorePixelRatio ||
 			visiblecontext.msBackingStorePixelRatio ||
@@ -168,9 +169,14 @@
 
 		//Monitor Battery - from: http://www.w3.org/TR/battery-status/
 		navigator.getBattery().then(function (batteryobj) {
-			ENV.BatteryLDT.push([batteryobj.level, batteryobj.dischargingTime, Math.round(performance.now())]);
+			TRIAL.BatteryLDT.push([batteryobj.level, batteryobj.dischargingTime, Math.round(performance.now())]);
+			logEVENTS("BatteryLDT", TRIAL.BatteryLDT[TRIAL.BatteryLDT.length - 1], "timeseries")
+
+
 			batteryobj.addEventListener('levelchange', function () {
-				ENV.BatteryLDT.push([batteryobj.level, batteryobj.dischargingTime, Math.round(performance.now())]);
+				TRIAL.BatteryLDT.push([batteryobj.level, batteryobj.dischargingTime, Math.round(performance.now())]);
+				logEVENTS("BatteryLDT", TRIAL.BatteryLDT[TRIAL.BatteryLDT.length - 1], "timeseries")
+
 			})
 		});
 		//============= (end) Initialize Audio & Battery Objects ==================//
@@ -280,6 +286,7 @@
 
 					// Make TrialQueue
 					var samplingStrategy = 'uniform_with_replacement' // todo: add more options; move into TASK
+
 					AutomatorPreBuffer['TrialQueue'][a] = new TrialQueue(samplingStrategy, automator_data[a].ImageBagsSample, automator_data[a].ImageBagsTest);
 
 					// Populate the stage's imagebuffer with some images
@@ -289,6 +296,7 @@
 				}
 				console.log('Done prebuffering')
 			} //if automator
+
 
 			//============= AWAIT LOAD SOUNDS =============//
 			soundpromises = sounds.serial.map(loadSoundfromDropbox2); //create array of sound load Promises
@@ -330,12 +338,12 @@
 					setupImageLoadingText()
 					windowWidth = document.body.clientWidth; //get true window dimensions at last possible moment
 					windowHeight = document.body.clientHeight;
-					setupCanvas(CANVAS.visible);
+					setupCanvas(VISIBLECANVAS);
 					if (ENV.DevicePixelRatio !== 1) {
-						scaleCanvasforHiDPI(CANVAS.visible);
+						scaleCanvasforHiDPI(VISIBLECANVAS);
 					}
-					CANVAS.offscreen = new OffscreenCanvas(CANVAS.visible.width, CANVAS.visible.height)
-					CANVAS.offscreen.commitTo = function (dest) {
+					OFFSCREENCANVAS = new OffscreenCanvas(VISIBLECANVAS.width, VISIBLECANVAS.height)
+					OFFSCREENCANVAS.commitTo = function (dest) {
 						var bitmap = this.transferToImageBitmap()
 						dest.transferFromImageBitmap(bitmap)
 					}
@@ -343,8 +351,8 @@
 					CANVAS.workspace = [
 						0,
 						0,
-						CANVAS.visible.width,
-						CANVAS.visible.height
+						VISIBLECANVAS.width,
+						VISIBLECANVAS.height
 					]
 
 					// Check if images were changed
@@ -352,6 +360,8 @@
 						FLAGS.need2loadImages = 1;
 					}
 					FLAGS.purge = 1
+					FLAGS.createnewfirestore = 1
+					EVENTS.reset()
 				} //if need2loadParameters
 
 				if (FLAGS.purge == 1) {
@@ -406,19 +416,23 @@
 				console.time('trial images loadtime:')
 				var c
 				[CURRTRIAL.sampleimage, CURRTRIAL.sampleindex, CURRTRIAL.testimages, CURRTRIAL.testindices, CURRTRIAL.correctitem] = await TQ.get_next_trial();
-				if (CURRTRIAL.sampleindex >0){
+				if (CURRTRIAL.sampleindex > 0) {
 					var soundchoice = sounds1
 					var idx = 0;
 				}
-				else{
+				else {
 					var soundchoice = sounds2
 					var idx = 0;
 				}
-				
+
 				var ssource = audiocontext.createBufferSource(); // creates a sound source
 				ssource.buffer = soundchoice.buffer[idx];                    // tell the source which sound to play
 				TASK.SOUND_DUR = Math.round(ssource.buffer.duration * 1000);
 				console.timeEnd('trial images loadtime:')
+
+				logEVENTS("Sample", CURRTRIAL.sampleindex, "trialseries")
+				logEVENTS("Test", CURRTRIAL.testindices, "trialseries")
+				logEVENTS("CorrectItem", CURRTRIAL.correctitem, "trialseries")
 
 				//============ WHILE RUN FIXATION SCREEN ============//
 				FLAGS.waitingforTouches = TASK.NFixations
@@ -434,6 +448,8 @@
 					else if (TASK.FixationMove <= 0) {
 						CURRTRIAL.fixationgridindex = TASK.StaticFixationGridIndex;
 					}
+					logEVENTS("FixationGridIndex", CURRTRIAL.fixationgridindex, "trialseries")
+
 
 					// Render fixation screen 
 					if (TASK.FixationUsesSample != 1) {
@@ -447,6 +463,8 @@
 
 					// Start timer for this fixation render trial. 
 					CURRTRIAL.starttime = Math.round(performance.now());
+					logEVENTS("StartTime", CURRTRIAL.starttime, "trialseries")
+
 					frame.shown = [];
 					for (var q in CANVAS.sequencepre) {
 						frame.shown[q] = 0
@@ -458,7 +476,7 @@
 					if (TASK.Species == 'marmoset') {
 						playSound(2)
 					}
-					renderScreen(CANVAS.sequencepre[0], CANVAS.offscreen)
+					renderScreen(CANVAS.sequencepre[0], OFFSCREENCANVAS)
 					await displayTrial(CANVAS.sequencepre, CANVAS.tsequencepre);
 					audiocontext.suspend()
 
@@ -467,13 +485,21 @@
 					CURRTRIAL.fixationtouchevent = touchhold_return.type
 					CURRTRIAL.fixationxyt = [touchhold_return.cxyt[1], touchhold_return.cxyt[2], touchhold_return.cxyt[3]]
 					CURRTRIAL.allfixationxyt[TASK.NFixations - FLAGS.waitingforTouches - 1] = CURRTRIAL.fixationxyt
+
+					logEVENTS("FixationTouchEvent", CURRTRIAL.fixationtouchevent, "trialseries")
+					logEVENTS("FixationXYT", CURRTRIAL.fixationxyt, "trialseries")
+
 					if (CURRTRIAL.fixationtouchevent == "touchheld") {
-						CURRTRIAL.response = CURRTRIAL.correctitem
+						if (TASK.RewardStage == 0 && FLAGS.waitingforTouches == 0) {
+							CURRTRIAL.response = CURRTRIAL.correctitem
+							logEVENTS("Response", CURRTRIAL.response, "trialseries")
+						}
 					} //touched fixation
 					else if (CURRTRIAL.fixationtouchevent == "touchbroken" &&
 						TASK.RewardStage == 0) {
 						CURRTRIAL.response = -1
 						FLAGS.waitingforTouches = 0 //exit loop
+						logEVENTS("Response", CURRTRIAL.response, "trialseries")
 					} //fixation task, but touched outside fixation
 					else if (CURRTRIAL.fixationtouchevent == "touchbroken" &&
 						TASK.RewardStage == 1) {
@@ -495,12 +521,13 @@
 					frame.shown = []
 					for (var q in CANVAS.sequence) { frame.shown[q] = 0 }
 					frame.current = 0
-					renderScreen(CANVAS.sequence[0], CANVAS.offscreen)
-					// change tsequence so that it changes for each sound played.
-					CANVAS.tsequence = [0, 100, 100 + TASK.SampleON, 100 + TASK.SOUND_DUR + TASK.SampleON, 100 + TASK.SOUND_DUR + TASK.SampleON + TASK.SampleOFF];
+					renderScreen(CANVAS.sequence[0], OFFSCREENCANVAS)
 					CURRTRIAL.tsequenceactual = await displayTrial(CANVAS.sequence, CANVAS.tsequence);
 					CURRTRIAL.tsequencedesired = CANVAS.tsequence
 					audiocontext.suspend()
+
+					logEVENTS("TSequenceActual", CURRTRIAL.tsequenceactual, "trialseries")
+					logEVENTS("TSequenceDesired", CURRTRIAL.tsequencedesired, "trialseries")
 
 					//========= AWAIT TOUCH RESPONSE =========//
 					FLAGS.waitingforTouches = 1
@@ -517,6 +544,10 @@
 					CURRTRIAL.responsetouchevent = race_return.type
 					CURRTRIAL.response = race_return.cxyt[0]
 					CURRTRIAL.responsexyt = [race_return.cxyt[1], race_return.cxyt[2], race_return.cxyt[3]]
+
+					logEVENTS("ResponseXYT", CURRTRIAL.responsexyt, "trialseries")
+					logEVENTS("ResponseTouchEvent", CURRTRIAL.responsetouchevent, "trialseries")
+					logEVENTS("Response", CURRTRIAL.response, "trialseries")
 
 					// Keep track of repeated responses to one side
 					if (CURRTRIAL.num > 0 && FLAGS.savedata && CURRTRIAL.responsetouchevent == "touchheld") {
@@ -556,6 +587,8 @@
 				} //# of rewards to give
 				ENV.RewardDuration = setReward();
 
+				logEVENTS("NReward", CURRTRIAL.nreward, "trialseries")
+
 				//============ DELIVER REWARD/PUNISH ============//
 				// REWARD
 				if (CURRTRIAL.correct) {
@@ -567,7 +600,7 @@
 						for (var q2 in CANVAS.sequencepost) { frame.shown[q2] = 0 }; frame.current = 0;
 
 						playSound(2);
-						renderScreen(CANVAS.sequencepost[0], CANVAS.offscreen)
+						renderScreen(CANVAS.sequencepost[0], OFFSCREENCANVAS)
 						var p1 = displayTrial(CANVAS.sequencepost, CANVAS.tsequencepost)
 						if (ble.connected == false && port.connected == false) {
 							await Promise.all([p1])
@@ -590,7 +623,7 @@
 					frame.shown = [];
 					for (var q in CANVAS.sequencepost) { frame.shown[q] = 0 }; frame.current = 0;
 
-					renderScreen(CANVAS.sequencepost[0], CANVAS.offscreen)
+					renderScreen(CANVAS.sequencepost[0], OFFSCREENCANVAS)
 					var p1 = displayTrial(CANVAS.sequencepost, CANVAS.tsequencepost);
 					var num_trials_to_buffer_in_punishperiod = 20
 					var p2 = TQ.generate_trials(num_trials_to_buffer_in_punishperiod)
@@ -616,6 +649,14 @@
 
 					// Save data asynchronously
 					saveBehaviorDatatoDropbox(TASK, ENV, CANVAS, TRIAL);
+
+					/*
+					// Save data asynchronously to Firestore
+					if (FLAGS.createnewfirestore == 1) {
+						saveBehaviorDatatoFirestore(TASK, ENV, CANVAS); //write once
+					}
+					updateEventDataonFirestore(EVENTS); //update with each trial
+					*/
 				}
 
 				if (FLAGS.need2saveParameters == 1) {
@@ -626,12 +667,14 @@
 				checkParameterFileStatus()
 				if ((new Date).getDate() != ENV.CurrentDate.getDate()) {
 					FLAGS.need2loadParameters = 1
+					FLAGS.createnewfirestore = 1
 				} //if new day
 				//================= (end) HOUSEKEEPING =================//
 
 				updateHeadsUpDisplay();
 				console.log('End of trial ', CURRTRIAL.num, '. TRIAL: ', TRIAL)
 				CURRTRIAL.num++
+				EVENTS.trialnum = CURRTRIAL.num
 			}
 		})();
 
